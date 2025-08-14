@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NEXTORA – Study Notes Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .animated-bg {
+      background: linear-gradient(270deg, #000000, #001133, #003366, #000000);
+      background-size: 600% 600%;
+      animation: gradientBG 25s ease infinite;
+    }
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+      animation: fadeIn 1s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="animated-bg text-white min-h-screen">
+
+  <header class="p-6 flex justify-between items-center animate-fade-in">
+    <h1 class="text-3xl font-extrabold tracking-wide">NEXTORA</h1>
+    <button onclick="location.href='index.html'" class="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition">
+      Home
+    </button>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-6 text-center mt-10">
+    <h2 class="text-4xl font-bold mb-4 animate-pulse">📚 Study Notes Generator</h2>
+    <p class="text-white/70 mb-6">Type any topic and get clear, concise AI-generated notes instantly.</p>
+
+    <!-- Suggestions -->
+    <div class="mb-4 flex flex-wrap justify-center gap-2">
+      <button class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-sm transition" onclick="setTopic('Photosynthesis')">Photosynthesis</button>
+      <button class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-sm transition" onclick="setTopic('World War II')">World War II</button>
+      <button class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-sm transition" onclick="setTopic('Newton\'s Laws')">Newton's Laws</button>
+      <button class="bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-sm transition" onclick="setTopic('Digital Marketing')">Digital Marketing</button>
+    </div>
+
+    <!-- Input and Button -->
+    <div class="glass-card mb-6">
+      <input type="text" id="topicInput" placeholder="Enter your topic (e.g. Quantum Physics)" 
+             class="w-full p-3 rounded bg-transparent border border-white/20 text-white placeholder:text-white/50" />
+      <button onclick="generateNotes()" class="mt-4 px-6 py-2 bg-blue-600 rounded hover:bg-blue-800 font-semibold transition">
+        Generate Notes
+      </button>
+    </div>
+
+    <!-- Output -->
+    <div id="output" class="glass-card text-left whitespace-pre-line max-h-96 overflow-y-auto relative">
+    </div>
+
+    <!-- Copy button -->
+    <button onclick="copyOutput()" id="copyBtn" class="hidden mt-3 px-4 py-2 bg-green-600 hover:bg-green-800 rounded transition">
+      📋 Copy Notes
+    </button>
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center text-white/40 text-sm mt-16 mb-4">
+    Made with ❤️ by the NEXTORA Team – Powered by Groq & LLaMA 3
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    const apiKey = "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"; // Replace with your key
+
+    function setTopic(text) {
+      document.getElementById("topicInput").value = text;
+      generateNotes();
+    }
+
+    document.getElementById("topicInput").addEventListener("keydown", function(event) {
+      if (event.key === "Enter") generateNotes();
+    });
+
+    async function generateNotes() {
+      const topic = document.getElementById("topicInput").value.trim();
+      const outputDiv = document.getElementById("output");
+      const copyBtn = document.getElementById("copyBtn");
+
+      if (!topic) {
+        alert("Please enter a topic.");
+        return;
+      }
+
+      outputDiv.innerHTML = `
+        <div class="flex items-center space-x-2 animate-pulse">
+          <svg class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span>Generating notes...</span>
+        </div>
+      `;
+      copyBtn.classList.add("hidden");
+
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: "llama3-70b-8192",
+            messages: [
+              {
+                role: "system",
+                content: "You are a helpful AI tutor that explains school topics in clear and concise notes for students."
+              },
+              {
+                role: "user",
+                content: `Write short, well-structured study notes on the topic: ${topic}`
+              }
+            ]
+          })
+        });
+
+        const data = await res.json();
+        const outputText = data.choices?.[0]?.message?.content || "No notes generated. Please try again.";
+        outputDiv.innerHTML = outputText;
+        copyBtn.classList.remove("hidden");
+      } catch (error) {
+        outputDiv.innerHTML = "❌ Error occurred while generating notes.";
+        console.error(error);
+      }
+    }
+
+    function copyOutput() {
+      const text = document.getElementById("output").innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Notes copied to clipboard!");
+      });
+    }
+  </script>
+</body>
+</html>

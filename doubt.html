@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXTORA – Doubt Solver</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tesseract .js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+  <!-- Font Awesome for camera / home icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap");
+    body{
+      font-family:Inter,system-ui,sans-serif;
+      background:linear-gradient(270deg,#0f051d,#1a103d,#3f0d38,#612e8b,#0f051d);
+      background-size:600% 600%;
+      animation:bgMove 25s ease infinite;
+      color:#fff
+    }
+    @keyframes bgMove{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+    .glass{
+      background:rgba(255,255,255,.05);
+      backdrop-filter:blur(14px);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:1rem;
+      box-shadow:0 8px 30px rgba(0,0,0,.45);
+      transition:transform .3s;
+    }
+    .glass:hover{transform:scale(1.02)}
+
+    /* Type-writer effect for answer */
+    .typewriter>*{overflow:hidden;white-space:pre-wrap;border-right:.15em solid #fff;animation:typing 3s steps(50,end),blink .75s step-end infinite}
+    @keyframes typing{from{width:0}to{width:100%}}
+    @keyframes blink{from,to{border-color:transparent}50%{border-color:#fff}}
+
+    /* Hide native file input */
+    #imgInput{display:none}
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- NAVBAR -->
+  <nav class="w-full backdrop-blur bg-white/10 border-b border-white/10 px-6 py-4 flex justify-between items-center">
+    <h1 class="text-lg font-bold tracking-wide">NEXTORA</h1>
+    <a href="index.html" class="hover:text-purple-300 transition-colors">
+      <i class="fa-solid fa-house mr-1"></i>Home
+    </a>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="flex-grow flex items-start justify-center pt-12 px-4">
+    <div class="w-full max-w-xl space-y-8">
+
+      <!-- INPUT CARD -->
+      <section class="glass p-8 space-y-5">
+        <h2 class="text-2xl font-bold mb-2 text-center">Doubt Solver</h2>
+
+        <!-- camera + file -->
+        <label for="imgInput" class="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 py-3 rounded-lg cursor-pointer transition">
+          <i class="fa-solid fa-camera text-lg"></i>
+          <span id="fileLabel">Upload diagram (optional)</span>
+        </label>
+        <input id="imgInput" type="file" accept="image/*" />
+
+        <!-- OR separator -->
+        <div class="text-center text-white/60">OR</div>
+
+        <!-- manual text -->
+        <textarea id="textInput" rows="3" placeholder="Type your question here…" class="w-full p-3 rounded-lg bg-white/10 border border-white/20 placeholder:text-white/50"></textarea>
+
+        <!-- solve button -->
+        <button id="solveBtn" class="w-full bg-purple-600 hover:bg-purple-700 py-2 rounded-full font-semibold transition">Solve Doubt</button>
+      </section>
+
+      <!-- RESULT -->
+      <section id="resultBox" class="glass p-6 hidden"></section>
+    </div>
+  </main>
+
+  <!-- SCRIPTS -->
+  <script>
+    const imgInput   = document.getElementById('imgInput');
+    const textInput  = document.getElementById('textInput');
+    const solveBtn   = document.getElementById('solveBtn');
+    const resultBox  = document.getElementById('resultBox');
+    const fileLabel  = document.getElementById('fileLabel');
+    const apiKey     = "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";
+
+    /* update label on file select */
+    imgInput.addEventListener('change',()=> fileLabel.textContent = imgInput.files.length ? imgInput.files[0].name : "Upload diagram (optional)");
+
+    solveBtn.addEventListener('click', async ()=>{
+
+      // reset & show result card
+      resultBox.classList.remove('hidden');
+      resultBox.innerHTML = "Processing…";
+
+      let queryText = "";
+
+      /* CASE 1: image provided */
+      if (imgInput.files.length){
+        const file = imgInput.files[0];
+        resultBox.innerHTML = "Reading image…";
+
+        try{
+          const { data:{ text } } = await Tesseract.recognize(file,'eng',{logger:m=>console.log(m)});
+          // keep only letters / digits / punctuation
+          queryText = text.replace(/[^\w\s\d.,?:!%\-+*/=()]/g," ").replace(/\s+/g," ").trim();
+        }catch(err){
+          resultBox.innerHTML = "<span class='text-red-400'>Could not read image. Try a clearer photo.</span>";
+          return;
+        }
+      }
+
+      /* CASE 2: no image, use manual text */
+      if(!queryText){
+        queryText = textInput.value.trim();
+        if(!queryText){
+          resultBox.innerHTML = "<span class='text-red-400'>Enter a question or upload an image.</span>";
+          return;
+        }
+      }
+
+      // show AI thinking
+      resultBox.textContent = "Getting answer…";
+
+      try{
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions",{
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer "+apiKey
+          },
+          body:JSON.stringify({
+            model:"llama3-8b-8192",
+            messages:[
+              {role:"system", content:"You are a helpful tutor. Answer clearly for a school student."},
+              {role:"user",   content:queryText}
+            ]
+          })
+        });
+        const data = await res.json();
+        const answer = (data.choices?.[0]?.message?.content || "No answer received.").trim();
+
+        // show with typewriter
+        resultBox.innerHTML = `<h3 class="text-xl font-bold mb-3">Answer:</h3><div class="typewriter"><p>${answer.replace(/\n/g,"<br>")}</p></div>`;
+      }catch(e){
+        resultBox.innerHTML = "<span class='text-red-400'>Failed to fetch answer. Please try again later.</span>";
+      }
+    });
+  </script>
+</body>
+</html>
